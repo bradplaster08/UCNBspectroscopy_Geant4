@@ -1,0 +1,84 @@
+#include "UCNBPrimaryGeneratorAction.hh"
+#include "UCNBDetectorConstruction.hh"
+#include "UCNBAnalysisManager.hh"
+
+#include "G4Event.hh"
+#include "G4ParticleGun.hh"
+#include "G4ParticleTable.hh"
+#include "G4ParticleDefinition.hh"
+#include "globals.hh"
+#include "Randomize.hh"
+
+UCNBPrimaryGeneratorAction::UCNBPrimaryGeneratorAction(
+                                                       UCNBDetectorConstruction* myDC)
+:UCNBDetector(myDC)
+{
+}
+
+UCNBPrimaryGeneratorAction::~UCNBPrimaryGeneratorAction()
+{
+  delete particleGun;
+}
+
+void UCNBPrimaryGeneratorAction::GeneratePrimaries(G4Event* anEvent)
+{
+
+  // Simple event
+  G4int n_particle = 1;
+  particleGun = new G4ParticleGun(n_particle);
+  G4ParticleTable* particleTable = G4ParticleTable::GetParticleTable();
+  //G4ParticleDefinition* particle = particleTable->FindParticle("e-");
+  G4ParticleDefinition* particle = particleTable->FindParticle("proton");
+  particleGun->SetParticleDefinition(particle);
+  //G4double Te0 = G4UniformRand()*500.*keV;
+  G4double Te0 = 500.*eV;
+  particleGun->SetParticleEnergy(Te0);
+
+  // Sample proton direction from 'C' asymmetry distribution
+  // W(theta) d(cos(theta)) = (1 + C*cos(theta))*d(cos(theta))
+  G4double bigC     = -0.2377;
+  G4double distMax  = 1. + (-1.)*bigC;
+  G4double testProb = 1.;
+  G4double prob     = 0.;
+
+  G4double costhTest, costh, sinth;
+  while(testProb > prob) {
+    costhTest = 1. - 2.*G4UniformRand();
+    //costhTest = 1. - G4UniformRand();
+    prob      = (1. + bigC*costhTest) / distMax;
+    testProb  = G4UniformRand();
+  }
+  //costh = 1.0;
+  costh = costhTest;
+  sinth = sqrt(1. - costh*costh);
+  G4double thetaProton = acos(costh);
+
+  // Construct proton momentum unit vector
+  G4double phi = 2.*3.14159265359*G4UniformRand();
+  G4double pxhat, pyhat, pzhat;
+  pxhat = sinth * cos(phi);
+  pyhat = sinth * sin(phi);
+  pzhat = costh;
+
+  //G4double thetaProton = 0.;
+  //px = 1./sqrt(3.);
+  //py = 1./sqrt(3.);
+  //pz = 1./sqrt(3.);
+  //px = 0.;
+  //py = 0.;
+  //pz = 1.;
+
+  particleGun->SetParticleMomentumDirection(G4ThreeVector(pxhat,pyhat,pzhat));
+
+  G4double x_vertex, y_vertex, z_vertex;
+  x_vertex = 0.0*m;
+  y_vertex = 0.0*m;
+  //z_vertex = 0.0*m;
+  z_vertex = (-1.5 + G4UniformRand()*3.0)*m;
+  particleGun->SetParticlePosition(G4ThreeVector(x_vertex,y_vertex,z_vertex));
+  particleGun->GeneratePrimaryVertex(anEvent);
+
+  // Save initial vertex variables
+  UCNBAnalysisManager::getInstance()->saveEventVertex(Te0/keV,
+    x_vertex/m, y_vertex/m, z_vertex/m, thetaProton);
+}

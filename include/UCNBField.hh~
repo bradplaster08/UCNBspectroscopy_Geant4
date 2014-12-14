@@ -1,0 +1,29 @@
+#ifndef UCNBField_h
+#define UCNBField_h 1
+
+#include "globals.hh"
+#include "G4ElectroMagneticField.hh"
+#include "G4FieldManager.hh"
+#include "G4TransportationManager.hh"
+
+class UCNBField
+#ifndef STANDALONE
+ : public G4ElectroMagneticField
+#endif
+
+{
+  
+public:
+  UCNBField();
+  void  GetFieldValue( const  double Point[4], double *Bfield ) const;
+  void LoadFieldMap();
+		       
+  G4bool DoesFieldChangeEnergy() const {return true;}
+
+private:
+  G4int nFieldPoints;
+  G4double zFieldMap[100], BFieldMap[100];
+
+};
+
+#endif

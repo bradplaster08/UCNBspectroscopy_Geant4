@@ -1,0 +1,366 @@
+#include "UCNBSteppingAction.hh"
+#include "UCNBEventAction.hh"
+#include "UCNBAnalysisManager.hh"
+
+#include "G4SteppingManager.hh"
+#include "G4ios.hh"
+#include "G4Track.hh"
+#include "globals.hh"
+
+#include "G4ParticleDefinition.hh"
+#include "G4DynamicParticle.hh"
+#include "G4Step.hh"
+#include "G4Track.hh"
+
+#include "TStopwatch.h"
+#include "G4EventManager.hh"
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+UCNBSteppingAction::UCNBSteppingAction()
+{
+}
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+void UCNBSteppingAction::UserSteppingAction(const G4Step* fStep)
+{
+  G4Track* fTrack = fStep->GetTrack();
+  G4int StepNo = fTrack->GetCurrentStepNumber();
+  //UCNBAnalysisManager::getInstance()->recordStepNumber(StepNo);
+  //if(StepNo >= 100000) fTrack->SetTrackStatus(fStopAndKill);
+
+  G4double eventTimeSoFar = ((UCNBEventAction*)G4EventManager::GetEventManager() ->
+			     GetUserEventAction())->getEventCPUTime();
+  
+  //if(StepNo >= 500 || eventTimeSoFar > 10.) {
+  if(eventTimeSoFar > 100.) {
+    //G4cout << "************ EVENT KILLED ********" << eventTimeSoFar << G4endl;
+    G4int iFlag = 1;
+    UCNBAnalysisManager::getInstance()->killEventFlag(iFlag);
+    fTrack->SetTrackStatus(fStopAndKill);
+  }
+
+#ifdef G4ANALYSIS_USE 
+#define COLLECT
+#endif
+#ifdef G4ANALYSIS_USE_ROOT
+#ifndef COLLECT
+#define COLLECT
+#endif
+#endif
+
+#ifdef COLLECT
+
+  // Determine volume of current step -> can cut on volume
+  //G4VPhysicalVolume* volume 
+  //= fStep->GetPreStepPoint()->GetTouchableHandle()->GetVolume();
+
+  // Retrieve dE and dx per step
+  //G4double energy = fStep->GetPreStepPoint()->GetKineticEnergy();
+
+  //G4double dETest = fStep->GetTotalEnergyDeposit();
+  //G4cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~ " << dETest/keV << G4endl;
+  //UCNBAnalysisManager::getInstance()->AddUpTotalEnergyDeposit(dETest/keV);
+
+
+  // Determine proton total time-of-flight and hit positions in Silicon detectors
+  if ( ((fStep->GetTrack()->GetTrackID() == 2)) )
+  {
+    G4Track* track = fStep -> GetTrack();
+    const G4DynamicParticle* dynParticle = track -> GetDynamicParticle();
+    G4ParticleDefinition* particle = dynParticle -> GetDefinition();
+    G4String particleName = particle -> GetParticleName();
+    //G4cout << "***NAME*** " << particleName << G4endl;
+
+    G4double dTstep = fStep->GetDeltaTime();
+    UCNBAnalysisManager::getInstance()->AddUpProtonDriftTime(dTstep/s);
+
+    if (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() == "Silicon1") {
+      G4ThreeVector hitSilicon1 = fStep->GetPreStepPoint()->GetPosition();
+      G4double xhitSilicon1 = hitSilicon1.x()/m;
+      G4double yhitSilicon1 = hitSilicon1.y()/m;
+      G4double zhitSilicon1 = hitSilicon1.z()/m;
+
+      UCNBAnalysisManager::getInstance()->recordSilicon1pPosition(xhitSilicon1,yhitSilicon1,zhitSilicon1);
+    }
+
+    if (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() == "Silicon2") {
+      G4ThreeVector hitSilicon2 = fStep->GetPreStepPoint()->GetPosition();
+      G4double xhitSilicon2 = hitSilicon2.x()/m;
+      G4double yhitSilicon2 = hitSilicon2.y()/m;
+      G4double zhitSilicon2 = hitSilicon2.z()/m;
+
+      UCNBAnalysisManager::getInstance()->recordSilicon2pPosition(xhitSilicon2,yhitSilicon2,zhitSilicon2);
+    }
+
+  }
+
+  // Determine electron hit positions in Silicon detectors and time-of-flight between Silicon detectors
+  if ( ((fStep->GetTrack()->GetTrackID() == 1)) )
+    //if ( ((fStep->GetTrack()->GetParentID() == 1)) )
+  {
+    G4Track* track = fStep -> GetTrack();
+    const G4DynamicParticle* dynParticle = track -> GetDynamicParticle();
+    G4ParticleDefinition* particle = dynParticle -> GetDefinition();
+    G4String particleName = particle -> GetParticleName();
+    //G4cout << "***NAME*** " << particleName << G4endl;
+
+    //G4double timeHit1 = 0.;
+    //G4double timeHit2 = 0.;
+
+    if (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() == "Silicon1" ) {
+      //timeHit1 = track->GetGlobalTime();
+      //UCNBAnalysisManager::getInstance()->globalTimeHit1 = timeHit1/s;
+
+      G4ThreeVector hitSilicon1 = fStep->GetPreStepPoint()->GetPosition();
+      G4double xhitSilicon1 = hitSilicon1.x()/m;
+      G4double yhitSilicon1 = hitSilicon1.y()/m;
+      G4double zhitSilicon1 = hitSilicon1.z()/m;
+
+      UCNBAnalysisManager::getInstance()->recordSilicon1ePosition(xhitSilicon1,yhitSilicon1,zhitSilicon1);
+    }
+
+    if (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() == "Silicon2") {
+      //timeHit2 = track->GetGlobalTime();
+      //UCNBAnalysisManager::getInstance()->globalTimeHit2 = timeHit2/s;
+
+      G4ThreeVector hitSilicon2 = fStep->GetPreStepPoint()->GetPosition();
+      G4double xhitSilicon2 = hitSilicon2.x()/m;
+      G4double yhitSilicon2 = hitSilicon2.y()/m;
+      G4double zhitSilicon2 = hitSilicon2.z()/m;
+
+      UCNBAnalysisManager::getInstance()->recordSilicon2ePosition(xhitSilicon2,yhitSilicon2,zhitSilicon2);
+    }
+
+
+
+  }
+
+  // Add up energy deposition in Silicon Detector #1
+  if (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() == "Silicon1")
+  {
+    G4Track* track = fStep -> GetTrack();
+    const G4DynamicParticle* dynParticle = track -> GetDynamicParticle();
+    G4ParticleDefinition* particle = dynParticle -> GetDefinition();
+    G4String particleName = particle -> GetParticleName();
+    //G4cout << "***NAME*** " << particleName << G4endl;
+
+    if ( ((fStep->GetTrack()->GetTrackID() != 2)) && ((fStep->GetTrack()->GetParentID() != 2)) ) {
+    //if ( ((fStep->GetTrack()->GetTrackID() == 1)) ) {
+    //if ( ((fStep->GetTrack()->GetParentID() == 0)) ) {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double timeHit1 = track->GetGlobalTime();
+      G4double test = UCNBAnalysisManager::getInstance()->globalTimeHit1;
+      if (dEstep/keV > 0. && timeHit1/s > test) {
+	UCNBAnalysisManager::getInstance()->globalTimeHit1 = timeHit1/s;
+      }
+    }
+    if ( ((fStep->GetTrack()->GetTrackID() != 2)) && ((fStep->GetTrack()->GetParentID() != 2)) )
+    //if ( ((fStep->GetTrack()->GetTrackID() == 1)) )
+    //if ( ((fStep->GetTrack()->GetParentID() == 0)) )
+      //if (particleName=="e+" || particleName=="e-")
+    {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double dxstep = fStep->GetStepLength();
+      UCNBAnalysisManager::getInstance()->AddUpElectronSilicon1EnergyDeposition(dEstep/keV);
+      //if (dEstep/keV > 0.) {
+      //timeHit1 = track->GetGlobalTime();
+      //	UCNBAnalysisManager::getInstance()->globalTimeHit1 = timeHit1/s;
+      //}
+      G4double timeHit1 = track->GetGlobalTime();
+      timeHit1 = timeHit1/s * 1.0e9;
+      G4int timeInt = (G4int) timeHit1;
+      if (timeInt > 499.) timeInt = 499;
+      UCNBAnalysisManager::getInstance()->EdepTimeBin1[timeInt] += dEstep/keV;
+    }
+
+    if ( ((fStep->GetTrack()->GetTrackID() == 2)) || ((fStep->GetTrack()->GetParentID() == 2)) )
+      //if ( ((fStep->GetTrack()->GetTrackID() == 2)) )
+    {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double dxstep = fStep->GetStepLength();
+      UCNBAnalysisManager::getInstance()->AddUpProtonSilicon1EnergyDeposition(dEstep/keV);
+    }
+
+  }
+
+  // Add up energy deposition in Silicon Detector #2
+  if (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() == "Silicon2")
+  {
+    G4Track* track = fStep -> GetTrack();
+    const G4DynamicParticle* dynParticle = track -> GetDynamicParticle();
+    G4ParticleDefinition* particle = dynParticle -> GetDefinition();
+    G4String particleName = particle -> GetParticleName();
+
+    //if ( ((fStep->GetTrack()->GetTrackID() == 1)) ) {
+    //if ( ((fStep->GetTrack()->GetParentID() == 0)) ) {
+    if ( ((fStep->GetTrack()->GetTrackID() != 2)) && ((fStep->GetTrack()->GetParentID() != 2)) ) {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double test = UCNBAnalysisManager::getInstance()->globalTimeHit2;
+      G4double timeHit2 = track->GetGlobalTime();
+      if (dEstep/keV > 0. && timeHit2/s > test) {
+	UCNBAnalysisManager::getInstance()->globalTimeHit2 = timeHit2/s;
+      }
+    }
+    //if (particleName=="e+" || particleName=="e-")
+    if ( ((fStep->GetTrack()->GetTrackID() != 2)) && ((fStep->GetTrack()->GetParentID() != 2)) )
+    //if ( ((fStep->GetTrack()->GetParentID() == 0)) )
+    //if ( ((fStep->GetTrack()->GetTrackID() == 1)) )
+    {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double dxstep = fStep->GetStepLength();
+      UCNBAnalysisManager::getInstance()->AddUpElectronSilicon2EnergyDeposition(dEstep/keV);
+      //if (dEstep/keV > 0.) {
+      //	timeHit2 = track->GetGlobalTime();
+      //	UCNBAnalysisManager::getInstance()->globalTimeHit2 = timeHit2/s;
+      //}
+      G4double timeHit2 = track->GetGlobalTime();
+      timeHit2 = timeHit2/s * 1.0e9;
+      G4int timeInt = (G4int) timeHit2;
+      if (timeInt > 499.) timeInt = 499;
+      UCNBAnalysisManager::getInstance()->EdepTimeBin2[timeInt] += dEstep/keV;
+    }
+
+    if ( ((fStep->GetTrack()->GetTrackID() == 2)) || ((fStep->GetTrack()->GetParentID() == 2)) )
+      //if ( ((fStep->GetTrack()->GetTrackID() == 2)) )
+    {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double dxstep = fStep->GetStepLength();
+      UCNBAnalysisManager::getInstance()->AddUpProtonSilicon2EnergyDeposition(dEstep/keV);
+    }
+
+  }
+
+  // Add up energy deposition in the Dead Layer for Silicon Detector #1
+  if (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() == "Dead1")
+  {
+    G4Track* track = fStep -> GetTrack();
+    const G4DynamicParticle* dynParticle = track -> GetDynamicParticle();
+    G4ParticleDefinition* particle = dynParticle -> GetDefinition();
+    G4String particleName = particle -> GetParticleName();
+
+    if ( ((fStep->GetTrack()->GetTrackID() != 2)) && ((fStep->GetTrack()->GetParentID() != 2)) ) {
+    //if ( ((fStep->GetTrack()->GetTrackID() == 1)) ) {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double test = UCNBAnalysisManager::getInstance()->globalTimeDead1;
+      G4double timeDead1 = track->GetGlobalTime();
+      if (dEstep/keV > 0. && timeDead1/s>test ) {
+	UCNBAnalysisManager::getInstance()->globalTimeDead1 = timeDead1/s;
+      }
+    }
+
+    //if ( ((fStep->GetTrack()->GetTrackID() == 1)) )
+    //if (particleName=="e+" || particleName=="e-")
+    if ( ((fStep->GetTrack()->GetTrackID() != 2)) && ((fStep->GetTrack()->GetParentID() != 2)) )
+    {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double dxstep = fStep->GetStepLength();
+      UCNBAnalysisManager::getInstance()->AddUpElectronDeadLayer1EnergyDeposition(dEstep/keV);
+      G4double timeDead1 = track->GetGlobalTime();
+      timeDead1 = timeDead1/s * 1.0e9;
+      G4int timeInt = (G4int) timeDead1;
+      if (timeInt > 499.) timeInt = 499;
+      UCNBAnalysisManager::getInstance()->EdepDeadTimeBin1[timeInt] += dEstep/keV;
+    }
+
+    if ( ((fStep->GetTrack()->GetTrackID() == 2)) || ((fStep->GetTrack()->GetParentID() == 2)) )
+      //if ( ((fStep->GetTrack()->GetTrackID() == 2)) )
+    {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double dxstep = fStep->GetStepLength();
+      UCNBAnalysisManager::getInstance()->AddUpProtonDeadLayer1EnergyDeposition(dEstep/keV);
+    }
+
+  }
+
+  // Add up energy deposition in the Dead Layer for Silicon Detector #2
+  if (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() == "Dead2")
+  {
+    G4Track* track = fStep -> GetTrack();
+    const G4DynamicParticle* dynParticle = track -> GetDynamicParticle();
+    G4ParticleDefinition* particle = dynParticle -> GetDefinition();
+    G4String particleName = particle -> GetParticleName();
+
+    //if ( ((fStep->GetTrack()->GetTrackID() == 1)) ) {
+    if ( ((fStep->GetTrack()->GetTrackID() != 2)) && ((fStep->GetTrack()->GetParentID() != 2)) ) {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double test = UCNBAnalysisManager::getInstance()->globalTimeDead2;
+      G4double timeDead2 = track->GetGlobalTime();
+      if (dEstep/keV > 0. && timeDead2/s > test) {
+	UCNBAnalysisManager::getInstance()->globalTimeDead2 = timeDead2/s;
+      }
+    }
+
+    //if ( ((fStep->GetTrack()->GetTrackID() == 1)) )
+    //if (particleName=="e+" || particleName=="e-")
+    if ( ((fStep->GetTrack()->GetTrackID() != 2)) && ((fStep->GetTrack()->GetParentID() != 2)) )
+    {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double dxstep = fStep->GetStepLength();
+      UCNBAnalysisManager::getInstance()->AddUpElectronDeadLayer2EnergyDeposition(dEstep/keV);
+      G4double timeDead2 = track->GetGlobalTime();
+      timeDead2 = timeDead2/s * 1.0e9;
+      G4int timeInt = (G4int) timeDead2;
+      if (timeInt > 499.) timeInt = 499;
+      UCNBAnalysisManager::getInstance()->EdepDeadTimeBin2[timeInt] += dEstep/keV;
+    }
+
+    if ( ((fStep->GetTrack()->GetTrackID() == 2)) || ((fStep->GetTrack()->GetParentID() == 2)) )
+      //if ( ((fStep->GetTrack()->GetTrackID() == 2)) )
+    {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double dxstep = fStep->GetStepLength();
+      UCNBAnalysisManager::getInstance()->AddUpProtonDeadLayer2EnergyDeposition(dEstep/keV);
+    }
+
+  }
+
+  // Add up energy loss elsewhere (including to secondaries)
+  //   http://hypernews.slac.stanford.edu/HyperNews/geant4/get/eventtrackmanage/1043/1/1.html
+  if ( (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() != "Silicon1") &&
+       (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() != "Silicon2") &&
+       (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() != "Dead1") &&
+       (fStep->GetPreStepPoint()->GetPhysicalVolume()->GetName() != "Dead2") )
+  {
+    G4Track* track = fStep -> GetTrack();
+    const G4DynamicParticle* dynParticle = track -> GetDynamicParticle();
+    G4ParticleDefinition* particle = dynParticle -> GetDefinition();
+    G4String particleName = particle -> GetParticleName();
+
+    //if ( ((fStep->GetTrack()->GetTrackID() == 1)) )
+    //if (particleName=="e+" || particleName=="e-")
+    if ( ((fStep->GetTrack()->GetTrackID() == 1)) )
+    {
+      G4double dEstep = fStep->GetTotalEnergyDeposit();
+      //G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double dxstep = fStep->GetStepLength();
+      UCNBAnalysisManager::getInstance()->AddUpElectronOtherEnergyDeposition(dEstep/keV);
+    }
+
+    if ( ((fStep->GetTrack()->GetTrackID() == 2)) )
+    {
+      //G4double dEstep = fStep->GetTotalEnergyDeposit();
+      G4double dEstep = fStep->GetDeltaEnergy(); dEstep = -1. * dEstep;
+      G4double dxstep = fStep->GetStepLength();
+      UCNBAnalysisManager::getInstance()->AddUpProtonOtherEnergyDeposition(dEstep/keV);
+    }
+
+  }
+
+#endif
+}
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......

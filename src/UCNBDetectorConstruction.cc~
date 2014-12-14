@@ -1,0 +1,266 @@
+#include "UCNBDetectorConstruction.hh"
+
+#include "G4VisAttributes.hh"
+#include "G4Colour.hh"
+
+#include "G4MaterialTable.hh"
+#include "G4Element.hh"
+#include "G4ElementTable.hh"
+#include "G4LogicalBorderSurface.hh"
+#include "G4LogicalSkinSurface.hh"
+
+#include "G4RotationMatrix.hh"
+#include "G4ThreeVector.hh"
+#include "G4Transform3D.hh"
+#include "G4OpBoundaryProcess.hh"
+
+UCNBDetectorConstruction::UCNBDetectorConstruction()
+  : solidWorld(0), logicalWorld(0), physicalWorld(0)
+{
+}
+
+UCNBDetectorConstruction::~UCNBDetectorConstruction()
+{
+}
+
+G4VPhysicalVolume* UCNBDetectorConstruction::Construct()
+{
+
+  // Material definitions
+  G4double a, z;
+  G4double density, temperature, pressure;
+  G4int nel, ncomponents, natoms;
+
+  // Air at STP
+  density = 1.293*mg/cm3;
+  G4Element* N = new G4Element("Nitrogen", "N", z=7., a=14.01*g/mole);
+  G4Element* O = new G4Element("Oxygen"  , "O", z=8., a=16.00*g/mole);
+  G4Material* Air = new G4Material("Air", density, nel=2);
+  Air->AddElement(N, 70*perCent);
+  Air->AddElement(O, 30*perCent);
+
+  // "Vacuum": 1e-6 Torr (low density air taken proportional to pressure)
+  G4double densityAirSTP = density;
+  pressure = 1e-99; // Torr
+  density  = (pressure/760.) * densityAirSTP;
+  G4Material* Vacuum = new G4Material("Vacuum", density, nel=2);
+  Vacuum->AddElement(N, 70*perCent);
+  Vacuum->AddElement(O, 30*perCent);
+
+  // Silicon: properties from wikipedia
+  G4Material *Silicon = new G4Material("Silicon", z=14., a=28.086*g/mole, density=2.329*g/cm3);
+
+  // Copper: properties from wikipedia
+  G4Material *Copper = new G4Material("Copper", z=29., a=63.546*g/mole, density=8.94*g/cm3);
+
+  // Stainless steel: model from http://hypernews.slac.stanford.edu/HyperNews/geant4/get/geometry/915/1.html
+  G4int nSS = 6;
+  G4double fractionmass;
+  density = 8.06*g/cm3;
+  G4Material* SS = new G4Material("SS", density, nSS);
+  G4Element* C = new G4Element("Carbon", "C", z=6., a=12.011*g/mole);
+  G4Element* Si = new G4Element("Silicon", "Si", z=14., z=28.086*g/mole);
+  G4Element* Cr = new G4Element("Chromium", "Cr", z=24., a=51.996*g/mole);
+  G4Element* Mn = new G4Element("Manganese", "Mn", z=25., a=54.938*g/mole);
+  G4Element* Fe = new G4Element("Iron", "Fe", z=26., a=55.845*g/mole);
+  G4Element* Ni = new G4Element("Nickel", "Ni", z=28., a=58.693*g/mole);
+  SS->AddElement(C,  fractionmass=0.001);
+  SS->AddElement(Si, fractionmass=0.007);
+  SS->AddElement(Cr, fractionmass=0.18);
+  SS->AddElement(Mn, fractionmass=0.01);
+  SS->AddElement(Fe, fractionmass=0.712);
+  SS->AddElement(Ni, fractionmass=0.09);
+
+  // Print all the material definitions
+  G4cout << G4endl << "Material Definitions : " << G4endl << G4endl;
+  G4cout << *(G4Material::GetMaterialTable()) << G4endl;
+
+  // Generate & Add Material Properties Table ------------
+
+  // Definitions of Solids, Logical Volumes, Physical Volumes ---------
+
+  // World volume
+  G4double world_x = 5.0*m;
+  G4double world_y = 5.0*m;
+  G4double world_z = 5.0*m;
+  solidWorld    = new G4Box("World", world_x, world_y, world_z);
+  logicalWorld  = new G4LogicalVolume(solidWorld, Vacuum, "World");
+  physicalWorld = new G4PVPlacement(0, G4ThreeVector(), logicalWorld, "World", 0, false, 0);
+
+  // Decay trap wall
+  G4double innerRadiusDecayTrap = 0.062*m;
+  G4double outerRadiusDecayTrap = 0.065*m;
+  G4double halfLengthDecayTrap = (3.0/2.0)*m;
+  G4double startAngleDecayTrap = 0.*deg;
+  G4double spanningAngleDecayTrap = 360.*deg;
+
+  G4double xDecayTrap = 0.0*m;
+  G4double yDecayTrap = 0.0*m;
+  G4double zDecayTrap = 0.0*m;
+
+  DecayTrap = new G4Tubs("DecayTrap", innerRadiusDecayTrap, outerRadiusDecayTrap, halfLengthDecayTrap,
+                         startAngleDecayTrap, spanningAngleDecayTrap);
+  logicalDecayTrap = new G4LogicalVolume(DecayTrap, Copper, "DecayTrap");
+  physicalDecayTrap = new G4PVPlacement(0, G4ThreeVector(xDecayTrap,yDecayTrap,zDecayTrap),
+                                        logicalDecayTrap, "DecayTrap", logicalWorld, false, 0);
+
+  // Decay trap interior
+  G4double innerRadiusDecayTrapInt = 0.000*m;
+  G4double outerRadiusDecayTrapInt = 0.062*m;
+  G4double halfLengthDecayTrapInt = (3.0/2.0)*m;
+  G4double startAngleDecayTrapInt = 0.*deg;
+  G4double spanningAngleDecayTrapInt = 360.*deg;
+
+  G4double xDecayTrapInt = 0.0*m;
+  G4double yDecayTrapInt = 0.0*m;
+  G4double zDecayTrapInt = 0.0*m;
+
+  DecayTrapInt = new G4Tubs("DecayTrapInt", innerRadiusDecayTrapInt, outerRadiusDecayTrapInt, halfLengthDecayTrapInt,
+                         startAngleDecayTrapInt, spanningAngleDecayTrapInt);
+  logicalDecayTrapInt = new G4LogicalVolume(DecayTrapInt, Vacuum, "DecayTrapInt");
+  physicalDecayTrapInt = new G4PVPlacement(0, G4ThreeVector(xDecayTrapInt,yDecayTrapInt,zDecayTrapInt),
+                                        logicalDecayTrapInt, "DecayTrapInt", logicalWorld, false, 0);
+
+  // Region between decay trap and Silicon detectors
+  G4double innerRadiusDrift12 = 0.000*m;
+  G4double outerRadiusDrift12 = 0.100*m;
+  G4double halfLengthDrift12 = ((2.2 - 1.5)/2.0)*m;
+  G4double startAngleDrift12 = 0.*deg;
+  G4double spanningAngleDrift12 = 360.*deg;
+
+  G4double xDrift12 = 0.0*m;
+  G4double yDrift12 = 0.0*m;
+  G4double zDrift12 = ((1.5 + 2.2)/2.0)*m;
+
+  Drift1 = new G4Tubs("Drift1", innerRadiusDrift12, outerRadiusDrift12, halfLengthDrift12,
+                       startAngleDrift12, spanningAngleDrift12);
+  logicalDrift1 = new G4LogicalVolume(Drift1, Vacuum, "Drift1");
+  physicalDrift1 = new G4PVPlacement(0, G4ThreeVector(xDrift12,yDrift12,zDrift12),
+                                         logicalDrift1, "Drift1", logicalWorld, false, 0);
+
+  Drift2 = new G4Tubs("Drift2", innerRadiusDrift12, outerRadiusDrift12, halfLengthDrift12,
+		      startAngleDrift12, spanningAngleDrift12);
+  logicalDrift2 = new G4LogicalVolume(Drift2, Vacuum, "Drift2");
+  physicalDrift2 = new G4PVPlacement(0, G4ThreeVector(xDrift12,yDrift12,-1.*zDrift12),
+				     logicalDrift2, "Drift2", logicalWorld, false, 0);
+
+  // Simple model for Silicon dead region
+  G4double tDead = 80.0e-9;
+  G4double innerRadiusDead = 0.000*m;
+  G4double outerRadiusDead = 0.075*m;
+  G4double thicknessDead = (tDead)*m;
+  G4double heightCylinderDead = thicknessDead/2.0;
+  G4double startAngleDead = 0.*deg;
+  G4double spanningAngleDead = 360.*deg;
+
+  G4double xDead = 0.0*m;
+  G4double yDead = 0.0*m;
+  G4double zDead = (2.2 + tDead/2.0)*m;
+
+  Dead1 = new G4Tubs("Dead1", innerRadiusDead, outerRadiusDead, heightCylinderDead,
+                     startAngleDead, spanningAngleDead);
+  logicalDead1 = new G4LogicalVolume(Dead1, Silicon, "Dead1");
+  physicalDead1 = new G4PVPlacement(0, G4ThreeVector(xDead,yDead,zDead),
+                                       logicalDead1, "Dead1", logicalWorld, false, 0);
+
+  Dead2 = new G4Tubs("Dead2", innerRadiusDead, outerRadiusDead, heightCylinderDead,
+                     startAngleDead, spanningAngleDead);
+  logicalDead2 = new G4LogicalVolume(Dead2, Silicon, "Dead2");
+  physicalDead2 = new G4PVPlacement(0, G4ThreeVector(xDead,yDead,-1.*zDead),
+				    logicalDead2, "Dead2", logicalWorld, false, 0);
+
+  // Simple model for Silicon active region
+  G4double tSi = 0.002;
+  G4double innerRadiusSilicon = 0.0*m;
+  G4double outerRadiusSilicon = 0.075*m;
+  G4double thicknessSilicon = (tSi - tDead)*m;
+  G4double heightCylinder = thicknessSilicon/2.0;
+  G4double startAngleSilicon = 0.*deg;
+  G4double spanningAngleSilicon = 360.*deg;
+
+  G4double xSilicon = 0.0*m;
+  G4double ySilicon = 0.0*m;
+  G4double zSilicon = (( (2.2+tDead) + (2.2+tSi) ) /2.0)*m;
+  //G4cout << "!!!!!!!!!!!!!!!!!!!!!" << " " << zSilicon << G4endl;
+
+  Silicon1 = new G4Tubs("Silicon1", innerRadiusSilicon, outerRadiusSilicon, heightCylinder,
+                        startAngleSilicon, spanningAngleSilicon);
+  logicalSilicon1 = new G4LogicalVolume(Silicon1, Silicon, "Silicon1");
+  physicalSilicon1 = new G4PVPlacement(0, G4ThreeVector(xSilicon,ySilicon,zSilicon),
+                                       logicalSilicon1, "Silicon1", logicalWorld, false, 0);
+
+  Silicon2 = new G4Tubs("Silicon2", innerRadiusSilicon, outerRadiusSilicon, heightCylinder,
+			startAngleSilicon, spanningAngleSilicon);
+  logicalSilicon2 = new G4LogicalVolume(Silicon2, Silicon, "Silicon2");
+  physicalSilicon2 = new G4PVPlacement(0, G4ThreeVector(xSilicon,ySilicon,-1.*zSilicon),
+                                       logicalSilicon2, "Silicon2", logicalWorld, false, 0);
+
+  // Electric and magnetic field definitions
+  Field = new UCNBField();
+  pEquation = new G4EqMagElectricField(Field);
+
+  G4int nvar = 8;
+  pStepper = new G4ClassicalRK4 (pEquation, nvar);
+
+  pFieldMgr = G4TransportationManager::GetTransportationManager()->GetFieldManager();
+  //pIntgrDriver = new G4MagInt_Driver(0.000001*mm,pStepper,pStepper->GetNumberOfVariables() );
+  pIntgrDriver = new G4MagInt_Driver(1e-5*m,pStepper,pStepper->GetNumberOfVariables() );
+  //pIntgrDriver = new G4MagInt_Driver(1.0*m,pStepper,pStepper->GetNumberOfVariables() );
+
+
+  pChordFinder = new G4ChordFinder(pIntgrDriver);
+  pFieldMgr->SetChordFinder( pChordFinder );
+  pFieldMgr->GetChordFinder()->SetDeltaChord(1e-5*m);
+  //pFieldMgr->GetChordFinder()->SetDeltaChord(1e-2*m);
+  pFieldMgr->SetFieldChangesEnergy(true);
+  pFieldMgr->SetDetectorField(Field);
+
+  // Test: as recommended by Emil Frlez
+  G4double myepsmin = 1.0e-5;
+  pFieldMgr->SetMinimumEpsilonStep(myepsmin);
+  pFieldMgr->SetMaximumEpsilonStep(myepsmin);
+  pFieldMgr->SetDeltaOneStep(1.0e-4*mm);
+
+
+
+  G4TransportationManager::GetTransportationManager()->GetPropagatorInField()->SetMaxLoopCount(INT_MAX);
+
+  // Test: as recommended by Emil Frlez
+  G4TransportationManager::GetTransportationManager()->GetPropagatorInField()->SetLargestAcceptableStep(0.01*mm); //
+
+  //logicalSuperfluidHelium1->SetFieldManager(pFieldMgr, true);
+
+  // Visualization attributes
+
+  logicalWorld->SetVisAttributes (G4VisAttributes::Invisible);
+
+  logicalDrift1->SetVisAttributes (G4VisAttributes::Invisible);
+  logicalDrift2->SetVisAttributes (G4VisAttributes::Invisible);
+  logicalDecayTrapInt->SetVisAttributes (G4VisAttributes::Invisible);
+
+  G4VisAttributes* simpleBoxVisAttGreen = new G4VisAttributes(G4Colour(0.0,1.0,0.0));
+  simpleBoxVisAttGreen->SetVisibility(true);
+  simpleBoxVisAttGreen->SetForceSolid(true);
+
+  logicalSilicon1->SetVisAttributes(simpleBoxVisAttGreen);
+  logicalSilicon2->SetVisAttributes(simpleBoxVisAttGreen);
+
+  G4VisAttributes* simpleBoxVisAttRed = new G4VisAttributes(G4Colour(1.0,0.0,0.0));
+  simpleBoxVisAttRed->SetVisibility(true);
+  simpleBoxVisAttRed->SetForceSolid(true);
+
+  logicalDead1->SetVisAttributes(simpleBoxVisAttRed);
+  logicalDead2->SetVisAttributes(simpleBoxVisAttRed);
+
+  //logicalDrift1->SetVisAttributes(simpleBoxVisAttRed);
+  //logicalDrift2->SetVisAttributes(simpleBoxVisAttRed);
+
+  G4VisAttributes* simpleBoxVisAttBlue = new G4VisAttributes(G4Colour(0.0,0.0,1.0));
+  simpleBoxVisAttBlue->SetVisibility(true);
+  simpleBoxVisAttBlue->SetForceSolid(true);
+
+  logicalDecayTrap->SetVisAttributes(simpleBoxVisAttBlue);
+
+  // Return the geometry
+  return physicalWorld;
+}

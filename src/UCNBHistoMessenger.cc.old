@@ -1,0 +1,40 @@
+#include "UCNBHistoMessenger.hh"
+
+#include <sstream>
+
+#include "UCNBHisto.hh"
+#include "G4UIdirectory.hh"
+#include "G4UIcommand.hh"
+#include "G4UIparameter.hh"
+#include "G4UIcmdWithAString.hh"
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+UCNBHistoMessenger::UCNBHistoMessenger(UCNBHisto* manager)
+:histo (manager)
+{
+  histoDir = new G4UIdirectory("/histo/");
+  histoDir->SetGuidance("histograms control");
+
+  factoryCmd = new G4UIcmdWithAString("/histo/fileName",this);
+  factoryCmd->SetGuidance("set name for the histograms file");
+  factoryCmd->AvailableForStates(G4State_PreInit,G4State_Idle); 
+}
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+UCNBHistoMessenger::~UCNBHistoMessenger()
+{
+  delete factoryCmd;
+  delete histoDir;
+}
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+
+void UCNBHistoMessenger::SetNewValue(G4UIcommand* command,G4String newValues)
+{
+  if (command == factoryCmd)
+    histo->setFileName(newValues);
+}
+
+//....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
